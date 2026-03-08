@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מערכת ניהול משימות</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .chat-container {
+            width: 90%;
+            max-width: 600px;
+            height: 80vh;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .chat-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .message {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            word-wrap: break-word;
+            animation: fadeIn 0.3s;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .user-message {
+            background: #667eea;
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+        .bot-message {
+            background: #f0f0f0;
+            color: #333;
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+        .chat-input-container {
+            padding: 20px;
+            background: #f9f9f9;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 10px;
+        }
+        .chat-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        .chat-input:focus {
+            border-color: #667eea;
+        }
+        .send-button {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .send-button:hover {
+            transform: scale(1.05);
+        }
+        .send-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .loading {
+            display: flex;
+            gap: 5px;
+            padding: 12px 16px;
+        }
+        .loading span {
+            width: 8px;
+            height: 8px;
+            background: #667eea;
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+        .loading span:nth-child(1) { animation-delay: -0.32s; }
+        .loading span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef, useEffect } = React;
+
+        function ChatApp() {
+            const [messages, setMessages] = useState([]);
+            const [input, setInput] = useState('');
+            const [loading, setLoading] = useState(false);
+            const messagesEndRef = useRef(null);
+
+            const scrollToBottom = () => {
+                messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+            };
+
+            useEffect(() => {
+                scrollToBottom();
+            }, [messages]);
+
+            const sendMessage = async () => {
+                if (!input.trim() || loading) return;
+
+                const userMessage = input.trim();
+                setInput('');
+                setMessages(prev => [...prev, { type: 'user', text: userMessage }]);
+                setLoading(true);
+
+                try {
+                    const response = await fetch('http://127.0.0.1:8000/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: userMessage })
+                    });
+                    const data = await response.json();
+                    setMessages(prev => [...prev, { type: 'bot', text: data.response }]);
+                } catch (error) {
+                    setMessages(prev => [...prev, { type: 'bot', text: 'שגיאה בתקשורת עם השרת' }]);
+                }
+                setLoading(false);
+            };
+
+            const handleKeyPress = (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            };
+
+            return (
+                <div className="chat-container">
+                    <div className="chat-header">
+                        🤖 מערכת ניהול משימות חכמה
+                    </div>
+                    <div className="chat-messages">
+                        {messages.map((msg, idx) => (
+                            <div key={idx} className={`message ${msg.type}-message`}>
+                                {msg.text}
+                            </div>
+                        ))}
+                        {loading && (
+                            <div className="message bot-message loading">
+                                <span></span><span></span><span></span>
+                            </div>
+                        )}
+                        <div ref={messagesEndRef} />
+                    </div>
+                    <div className="chat-input-container">
+                        <input
+                            type="text"
+                            className="chat-input"
+                            placeholder="כתבי כאן את הבקשה שלך..."
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            onKeyPress={handleKeyPress}
+                            disabled={loading}
+                        />
+                        <button 
+                            className="send-button" 
+                            onClick={sendMessage}
+                            disabled={loading || !input.trim()}
+                        >
+                            שלח
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<ChatApp />, document.getElementById('root'));
+    </script>
+</body>
+</html>
